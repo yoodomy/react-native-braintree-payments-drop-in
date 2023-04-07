@@ -1,7 +1,7 @@
 package tech.bam.RNBraintreeDropIn;
+
 import android.app.Activity;
 import androidx.annotation.NonNull;
-import com.braintreegateway.encryption.BraintreeClientToken;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -84,61 +84,64 @@ public class RNBraintreeDropInModule extends ReactContextBaseJavaModule implemen
             dropInRequest.setThreeDSecureRequest(threeDSecureRequest);
         }
 
-        // Other drop-in request configurations...
+                // Other drop-in request configurations...
 
-        mPromise = promise;
-        dropInClient.launchDropIn(dropInRequest);
-    }
-
-    @Override
-    public void onDropInSuccess(@NonNull DropInResult result) {
-        if (mPromise != null) {
-            PaymentMethodNonce paymentMethodNonce = result.getPaymentMethodNonce();
-            String nonce = paymentMethodNonce.getString();
-            boolean threeDSecure = false;
-
-            if (paymentMethodNonce instanceof CardNonce) {
-                CardNonce cardNonce = (CardNonce) paymentMethodNonce;
-                ThreeDSecureInfo threeDSecureInfo = cardNonce.getThreeDSecureInfo();
-
-                if (threeDSecureInfo != null) {
-                    threeDSecure = threeDSecureInfo.isLiabilityShifted() || threeDSecureInfo.isLiabilityShiftPossible();
+                mPromise = promise;
+                dropInClient.launchDropIn(dropInRequest);
+            }
+        
+            @Override
+            public void onDropInSuccess(@NonNull DropInResult result) {
+                if (mPromise != null) {
+                    PaymentMethodNonce paymentMethodNonce = result.getPaymentMethodNonce();
+                    String nonce = paymentMethodNonce.getString();
+                    boolean threeDSecure = false;
+        
+                    if (paymentMethodNonce instanceof CardNonce) {
+                        CardNonce cardNonce = (CardNonce) paymentMethodNonce;
+                        ThreeDSecureInfo threeDSecureInfo = cardNonce.getThreeDSecureInfo();
+        
+                        if (threeDSecureInfo != null) {
+                            threeDSecure = threeDSecureInfo.isLiabilityShifted() || threeDSecureInfo.isLiabilityShiftPossible();
+                        }
+                    }
+        
+                    mPromise.resolve(convertNonceToWritableMap(nonce, threeDSecure));
+                    mPromise = null;
                 }
             }
-
-            mPromise.resolve(convertNonceToWritableMap(nonce, threeDSecure));
-            mPromise = null;
+        
+            @Override
+            public void onDropInFailure(@NonNull Exception error) {
+                if (mPromise != null) {
+                    mPromise.reject("DROP_IN_ERROR", error.getMessage());
+                    mPromise = null;
+                }
+            }
+        
+            @Override
+            public void onUserCanceled() {
+                if (mPromise != null) {
+                    mPromise.reject("USER_CANCELED", "User canceled the payment");
+                    mPromise = null;
+                }
+            }
+        
+            // Helper method to convert the nonce and threeDSecure to a WritableMap
+        
+            @NonNull
+            private WritableMap convertNonceToWritableMap(String nonce, boolean threeDSecure) {
+                WritableMap map = Arguments.createMap();
+                map.putString("nonce", nonce);
+                map.putBoolean("threeDSecure", threeDSecure);
+                return map;
+            }
+        
+            @Override
+            public String getName() {
+                return "RNBraintreeDropIn";
+            }
         }
-    }
+        
 
-    @Override
-    public void onDropInFailure(@NonNull Exception error) {
-        if (mPromise != null) {
-            mPromise.reject("DROP_IN_ERROR", error.getMessage());
-            mPromise = null;
-        }
-    }
-
-    @Override
-    public void onUserCanceled() {
-        if (mPromise != null) {
-            mPromise.reject("USER_CANCELED", "User canceled the payment");
-            mPromise = null;
-        }
-    }
-
-    // Helper method to convert the nonce and threeDSecure to a WritableMap
-
-    @NonNull
-    private WritableMap convertNonceToWritableMap(String nonce, boolean threeDSecure) {
-        WritableMap map = Arguments.createMap();
-        map.putString("nonce", nonce);
-        map.putBoolean("threeDSecure", threeDSecure);
-        return map;
-    }
-
-    @Override
-    public String getName() {
-        return "RNBraintreeDropIn";
-    }
-}
+       
